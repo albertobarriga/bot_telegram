@@ -2,6 +2,7 @@ import telebot
 import os
 import requests
 import json
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -63,7 +64,23 @@ def process_stock_symbol_input(message):
             msg += f"Valor de cierre: {values['4. close']}\n"
             msg += f"Volumen: {values['5. volume']}\n"
             msg += "-----------------------------\n"
+            
+        # Crear un gráfico de barras con los valores de cierre
+        dates = list(filtered_data.keys())
+        close_values = [float(values['4. close']) for values in filtered_data.values()]
 
+        plt.figure(figsize=(10, 6))
+        plt.bar(dates, close_values, color='blue')
+        plt.xlabel('Fechas')
+        plt.ylabel('Valor de cierre')
+        plt.title(f'Valores de cierre de {stock_symbol} en 2023 y 2024')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig('stock_chart.png')
+
+        # Enviar el mensaje al usuario con la imagen del gráfico
+        bot.send_photo(message.chat.id, open('stock_chart.png', 'rb'))
+        plt.close()
         # Enviar el mensaje al usuario
         bot.reply_to(message, msg)
     else:
@@ -76,4 +93,3 @@ def echo_all(message):
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
-
