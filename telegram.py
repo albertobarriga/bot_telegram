@@ -69,6 +69,10 @@ def process_stock_symbol_input(message):
         dates = list(filtered_data.keys())
         close_values = [float(values['4. close']) for values in filtered_data.values()]
 
+        # Invertir el orden de los datos
+        dates = dates[::-1]
+        close_values = close_values[::-1]
+
         plt.figure(figsize=(10, 6))
         plt.bar(dates, close_values, color='blue')
         plt.xlabel('Fechas')
@@ -93,3 +97,4 @@ def echo_all(message):
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
+
