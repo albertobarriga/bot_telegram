@@ -1,3 +1,3 @@
 {
-    "postCreateCommand": "python3 telegram.py"
+    "postCreateCommand": "./setup.sh"
 }
