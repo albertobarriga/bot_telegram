@@ -17,11 +17,22 @@ acciones = {}
 # Comandos
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, 'Soy el bot de Alberto')
+    welcome_message = ("¡Bienvenido al Bot de Bolsa!\n\n"
+                       "Este bot te proporciona información sobre el comportamiento de las acciones en los últimos 12 meses "
+                       "y las noticias más relevantes de los últimos 7 días.\n\n"
+                       "Puedes utilizar los siguientes comandos:\n"
+                       "/bolsa - Para consultar información sobre una acción\n"
+                       "/help - Para obtener ayuda y ver los comandos disponibles")
+    bot.reply_to(message, welcome_message)
 
 @bot.message_handler(commands=['help'])
-def send_welcome(message):
-    bot.reply_to(message, 'Solo respondo a start y help')
+def send_help(message):
+    help_message = ("Este bot te permite obtener información sobre acciones y noticias del mercado financiero.\n\n"
+                    "Comandos disponibles:\n"
+                    "/bolsa - Consultar información sobre una acción\n"
+                    "/start - Iniciar el bot y recibir información de bienvenida\n"
+                    "/help - Ver esta ayuda")
+    bot.reply_to(message, help_message)
 
 @bot.message_handler(commands=['bolsa'])
 def ask_for_stock_symbol(message):
@@ -38,6 +49,13 @@ def process_stock_symbol_input(message):
     # Almacenar el símbolo de la acción en el diccionario
     acciones[message.chat.id] = stock_symbol
 
+    # Obtener y enviar datos de la bolsa
+    enviar_datos_bolsa(message, stock_symbol)
+
+    # Obtener y enviar noticias de la acción
+    enviar_noticias(message, stock_symbol)
+
+def enviar_datos_bolsa(message, stock_symbol):
     # Construir la URL de la API con el símbolo de la acción
     url = f'https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol={stock_symbol}&interval=5min&apikey={API_KEY}'
 
@@ -48,39 +66,41 @@ def process_stock_symbol_input(message):
     if response.status_code == 200:
         data = json.loads(response.text)
         
-        # Filtrar datos para los últimos 12 meses
+        # Filtrar datos para el último mes
         today = datetime.now().date()
-        twelve_months_ago = today - timedelta(days=365)
+        one_month_ago = today - timedelta(days=365)
         filtered_data = {}
         for date, values in data['Monthly Time Series'].items():
             year_month = datetime.strptime(date, '%Y-%m-%d').date()
-            if twelve_months_ago <= year_month <= today:
+            if one_month_ago <= year_month <= today:
                 filtered_data[date] = values
 
         # Crear un mensaje con la información filtrada
-        msg = ""
-        for date, values in filtered_data.items():
-            msg += f"Fecha: {date}\n"
-            msg += f"Valor de apertura: {values['1. open']}\n"
-            msg += f"Valor máximo: {values['2. high']}\n"
-            msg += f"Valor mínimo: {values['3. low']}\n"
-            msg += f"Valor de cierre: {values['4. close']}\n"
-            msg += f"Volumen: {values['5. volume']}\n"
-            msg += "-----------------------------\n"
+    msg = ""
+    # Obtener las fechas en orden descendente
+    dates_sorted = sorted(filtered_data.keys(), reverse=True)
+    
+    # Tomar solo las primeras dos fechas
+    for date in dates_sorted[:2]:
+        values = filtered_data[date]
+        msg += f"Fecha: {date}\n"
+        msg += f"Valor de apertura: {values['1. open']}\n"
+        msg += f"Valor máximo: {values['2. high']}\n"
+        msg += f"Valor mínimo: {values['3. low']}\n"
+        msg += f"Valor de cierre: {values['4. close']}\n"
+        msg += f"Volumen: {values['5. volume']}\n"
+        msg += "-----------------------------\n"
+    
             
         # Crear un gráfico de barras con los valores de cierre
         dates = list(filtered_data.keys())
         close_values = [float(values['4. close']) for values in filtered_data.values()]
 
-        # Invertir el orden de los datos
-        dates = dates[::-1]
-        close_values = close_values[::-1]
-
         plt.figure(figsize=(10, 6))
         plt.bar(dates, close_values, color='blue')
         plt.xlabel('Fechas')
         plt.ylabel('Valor de cierre')
-        plt.title(f'Valores de cierre de {stock_symbol} en los últimos 12 meses')
+        plt.title(f'Valores de cierre de {stock_symbol} en el último mes')
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig('stock_chart.png')
@@ -93,6 +113,24 @@ def process_stock_symbol_input(message):
     else:
         # Mostrar un mensaje de error si la solicitud no fue exitosa
         bot.reply_to(message, f"Error en la solicitud. Código de respuesta: {response.status_code}")
+
+def enviar_noticias(message, stock_symbol):
+    now = datetime.now()
+    one_week_ago = now - timedelta(days=7)
+    # Formatear la fecha de hace una semana en el formato YYYYMMDDTHHMM
+    time_from = one_week_ago.strftime('%Y%m%dT%H%M')
+    url = f'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={stock_symbol}&time_from={time_from}&limit=1000&apikey={API_KEY}'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = json.loads(response.text)
+        noticias = ""
+        for article in data['feed']:
+            title = article.get('title', 'N/A')
+            url = article.get('url', 'N/A')
+            noticias += f"<b>{title}</b>\n{url}\n\n"
+        bot.reply_to(message, noticias, parse_mode='HTML')
+    else:
+        bot.reply_to(message, "No se encontraron noticias para esta acción.")
 
 @bot.message_handler(func=lambda m: True)
 def echo_all(message):
