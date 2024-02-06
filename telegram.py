@@ -3,6 +3,7 @@ import os
 import requests
 import json
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,11 +48,13 @@ def process_stock_symbol_input(message):
     if response.status_code == 200:
         data = json.loads(response.text)
         
-        # Filtrar datos para los años 2023 y 2024
+        # Filtrar datos para los últimos 12 meses
+        today = datetime.now().date()
+        twelve_months_ago = today - timedelta(days=365)
         filtered_data = {}
         for date, values in data['Monthly Time Series'].items():
-            year = int(date.split('-')[0])
-            if year in [2023, 2024]:
+            year_month = datetime.strptime(date, '%Y-%m-%d').date()
+            if twelve_months_ago <= year_month <= today:
                 filtered_data[date] = values
 
         # Crear un mensaje con la información filtrada
@@ -77,7 +80,7 @@ def process_stock_symbol_input(message):
         plt.bar(dates, close_values, color='blue')
         plt.xlabel('Fechas')
         plt.ylabel('Valor de cierre')
-        plt.title(f'Valores de cierre de {stock_symbol} en 2023 y 2024')
+        plt.title(f'Valores de cierre de {stock_symbol} en los últimos 12 meses')
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig('stock_chart.png')
@@ -97,4 +100,3 @@ def echo_all(message):
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
-
