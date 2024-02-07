@@ -158,20 +158,20 @@ def account(message):
   # Redirigir al usuario al comando /añadir
     bot.send_message(message.chat.id, "Ahora puedes añadir las acciones que deseas seguir utilizando el comando /añadir .")
 
-# Comando /añadir
-@bot.message_handler(commands=['añadir'])
-def add_stock_symbol(message):
-    bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
-    bot.register_next_step_handler(message, process_stock_symbol_input)
+# # Comando /añadir
+# @bot.message_handler(commands=['añadir'])
+# def add_stock_symbol(message):
+#     bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
+#     bot.register_next_step_handler(message, process_stock_symbol_input)
 
-def process_stock_symbol_input(message):
-    # Obtener el símbolo de la acción ingresado por el usuario
-    stock_symbol = message.text.upper()
+# def process_stock_symbol_input(message):
+#     # Obtener el símbolo de la acción ingresado por el usuario
+#     stock_symbol = message.text.upper()
 
-    # Aquí puedes guardar la acción en la base de datos asociada al usuario
-    # Por ejemplo, podrías insertar la acción en la tabla de acciones de usuario
+#     # Aquí puedes guardar la acción en la base de datos asociada al usuario
+#     # Por ejemplo, podrías insertar la acción en la tabla de acciones de usuario
 
-    bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
+#     bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
