@@ -92,27 +92,25 @@ def enviar_datos_bolsa(message, stock_symbol):
         msg += "-----------------------------\n"
     
             
-        # Crear un gráfico de barras con los valores de cierre
-        dates = list(filtered_data.keys())
-        close_values = [float(values['4. close']) for values in filtered_data.values()]
-
-        plt.figure(figsize=(10, 6))
-        plt.bar(dates, close_values, color='blue')
-        plt.xlabel('Fechas')
-        plt.ylabel('Valor de cierre')
-        plt.title(f'Valores de cierre de {stock_symbol} en el último mes')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.savefig('stock_chart.png')
-
-        # Enviar el mensaje al usuario con la imagen del gráfico
-        bot.send_photo(message.chat.id, open('stock_chart.png', 'rb'))
-        plt.close()
-        # Enviar el mensaje al usuario
-        bot.reply_to(message, msg)
-    else:
+    # Crear un gráfico de barras con los valores de cierre
+    dates = list(filtered_data.keys())
+    close_values = [float(values['4. close']) for values in filtered_data.values()]
+    plt.figure(figsize=(10, 6))
+    plt.bar(dates, close_values, color='blue')
+    plt.xlabel('Fechas')
+    plt.ylabel('Valor de cierre')
+    plt.title(f'Valores de cierre de {stock_symbol} en los ultimos meses')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('stock_chart.png')
+    # Enviar el mensaje al usuario con la imagen del gráfico
+    bot.send_photo(message.chat.id, open('stock_chart.png', 'rb'))
+    plt.close()
+    # Enviar el mensaje al usuario
+    bot.reply_to(message, msg)
+    #else:
         # Mostrar un mensaje de error si la solicitud no fue exitosa
-        bot.reply_to(message, f"Error en la solicitud. Código de respuesta: {response.status_code}")
+        #bot.reply_to(message, f"Error en la solicitud. Código de respuesta: {response.status_code}")
 
 def enviar_noticias(message, stock_symbol):
     now = datetime.now()
