@@ -5,6 +5,7 @@ import json
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import psycopg2
 
 load_dotenv()
 
@@ -14,7 +15,7 @@ API_KEY = os.getenv('API_KEY')
 # Diccionario para almacenar los símbolos de las acciones proporcionados por los usuarios
 acciones = {}
 
-# Comandos
+# Comando /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_message = ("¡Bienvenido al Bot de Bolsa!\n\n"
@@ -25,6 +26,7 @@ def send_welcome(message):
                        "/help - Para obtener ayuda y ver los comandos disponibles")
     bot.reply_to(message, welcome_message)
 
+# Comando /help
 @bot.message_handler(commands=['help'])
 def send_help(message):
     help_message = ("Este bot te permite obtener información sobre acciones y noticias del mercado financiero.\n\n"
@@ -130,9 +132,46 @@ def enviar_noticias(message, stock_symbol):
     else:
         bot.reply_to(message, "No se encontraron noticias para esta acción.")
 
-@bot.message_handler(func=lambda m: True)
-def echo_all(message):
-    bot.reply_to(message, message.text)
+
+# Comando /account
+@bot.message_handler(commands=['account'])
+def account(message):
+    # Obtener ID del usuario
+    user_id = message.from_user.id
+
+    # Insertar el ID del usuario en la base de datos
+    conn = psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host='db',  # Cambia localhost por el nombre del servicio del contenedor de la base de datos
+        port=os.getenv('DB_PORT')
+    )
+    cur = conn.cursor()
+    cur.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
+                (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.reply_to(message, "¡Hola! Has sido registrado en la base de datos.")
+  # Redirigir al usuario al comando /añadir
+    bot.send_message(message.chat.id, "Ahora puedes añadir las acciones que deseas seguir utilizando el comando /añadir .")
+
+# Comando /añadir
+@bot.message_handler(commands=['añadir'])
+def add_stock_symbol(message):
+    bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
+    bot.register_next_step_handler(message, process_stock_symbol_input)
+
+def process_stock_symbol_input(message):
+    # Obtener el símbolo de la acción ingresado por el usuario
+    stock_symbol = message.text.upper()
+
+    # Aquí puedes guardar la acción en la base de datos asociada al usuario
+    # Por ejemplo, podrías insertar la acción en la tabla de acciones de usuario
+
+    bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
