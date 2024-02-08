@@ -1,4 +1,4 @@
--HACER ENTORNO VIRTUAL:
+- HACER ENTORNO VIRTUAL:
 python3 -m venv .venv
 
 source .venv/bin/activate
@@ -18,8 +18,9 @@ SELECT * FROM users;
 -CREAR TABLA EN LA BASE DE DATOS:
 
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER UNIQUE
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE,
+	acciones text[]
 );
 
 ALTER TABLE users

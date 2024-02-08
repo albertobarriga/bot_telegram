@@ -26,15 +26,20 @@ def send_welcome(message):
                        "/help - Para obtener ayuda y ver los comandos disponibles")
     bot.reply_to(message, welcome_message)
 
-# Comando /help
-@bot.message_handler(commands=['help'])
-def send_help(message):
-    help_message = ("Este bot te permite obtener información sobre acciones y noticias del mercado financiero.\n\n"
-                    "Comandos disponibles:\n"
-                    "/bolsa - Consultar información sobre una acción\n"
-                    "/start - Iniciar el bot y recibir información de bienvenida\n"
-                    "/help - Ver esta ayuda")
-    bot.reply_to(message, help_message)
+# Comando /info
+@bot.message_handler(commands=['info'])
+def send_info(message):
+    info_message = ("¡Bienvenido al Bot de Bolsa!\n\n"
+                    "Este bot te proporciona información sobre el comportamiento de las acciones en los últimos 12 meses "
+                    "y las noticias más relevantes de los últimos 7 días.\n\n"
+                    "Puedes utilizar los siguientes comandos:\n"
+                    "/bolsa - Para consultar información sobre una acción\n"
+                    "/consult - Para consultar tus acciones guardadas\n"
+                    "/account - Para incluirse en la base de datos y poder guardar acciones\n"
+                    "/add - Para añadir una acción a tus seguimientos\n"
+                    "/modify - Para eliminar una acción de tus seguimientos\n"
+                    "/help - Para obtener ayuda y ver los comandos disponibles")
+    bot.reply_to(message, info_message)
 
 @bot.message_handler(commands=['bolsa'])
 def ask_for_stock_symbol(message):
@@ -42,9 +47,9 @@ def ask_for_stock_symbol(message):
     bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas consultar (por ejemplo, BBVA):')
 
     # Cambiar el estado del usuario para esperar la respuesta con el símbolo de la acción
-    bot.register_next_step_handler(message, process_stock_symbol_input)
+    bot.register_next_step_handler(message, process_stock_symbol_input_bolsa)
 
-def process_stock_symbol_input(message):
+def process_stock_symbol_input_bolsa(message):
     # Obtener el símbolo de la acción ingresado por el usuario
     stock_symbol = message.text.upper()
 
@@ -158,7 +163,7 @@ def account(message):
   # Redirigir al usuario al comando /añadir
     bot.send_message(message.chat.id, "Ahora puedes añadir las acciones que deseas seguir utilizando el comando /añadir .")
 
-@bot.message_handler(commands=['añadir'])
+@bot.message_handler(commands=['add'])
 def add_stock_symbol(message):
     bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
     bot.register_next_step_handler(message, process_stock_symbol_input)
@@ -198,6 +203,86 @@ def process_stock_symbol_input(message):
     except psycopg2.Error as e:
         conn.rollback()
         bot.reply_to(message, f"No se pudo añadir la acción {stock_symbol}. Error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+# Comando /consult
+@bot.message_handler(commands=['consult'])
+def consultar_acciones(message):
+    # Obtener el ID del usuario
+    user_id = message.from_user.id
+
+    # Conectar a la base de datos
+    conn = psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host='db',  # Cambia localhost por el nombre del servicio del contenedor de la base de datos
+        port=os.getenv('DB_PORT')
+    )
+    cur = conn.cursor()
+
+    try:
+        # Obtener las acciones del usuario desde la base de datos
+        cur.execute("SELECT acciones FROM users WHERE user_id = %s", (user_id,))
+        user_actions = cur.fetchone()
+
+        if user_actions:
+            bot.reply_to(message, f"Tus acciones guardadas son: {', '.join(user_actions[0])}")
+        else:
+            bot.reply_to(message, "No tienes acciones guardadas en la base de datos.")
+    except psycopg2.Error as e:
+        bot.reply_to(message, f"No se pudo consultar las acciones. Error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+# Comando /modify
+@bot.message_handler(commands=['modify'])
+def eliminar_accion(message):
+    # Obtener el ID del usuario
+    user_id = message.from_user.id
+
+    # Pedir al usuario el símbolo de la acción a eliminar
+    bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas eliminar:')
+
+    # Registrar el siguiente paso para manejar la entrada del usuario
+    bot.register_next_step_handler(message, lambda msg: process_eliminar_accion(msg, user_id))
+
+def process_eliminar_accion(message, user_id):
+    # Obtener el símbolo de la acción ingresado por el usuario
+    stock_symbol = message.text.upper()
+
+    # Conectar a la base de datos
+    conn = psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host='db',  # Cambia localhost por el nombre del servicio del contenedor de la base de datos
+        port=os.getenv('DB_PORT')
+    )
+    cur = conn.cursor()
+
+    try:
+        # Obtener las acciones actuales del usuario
+        cur.execute("SELECT acciones FROM users WHERE user_id = %s", (user_id,))
+        current_actions = cur.fetchone()[0]
+
+        # Verificar si la acción está en la lista de acciones del usuario
+        if current_actions and stock_symbol in current_actions:
+            # Eliminar la acción de la lista
+            current_actions.remove(stock_symbol)
+
+            # Actualizar la lista de acciones en la base de datos
+            cur.execute("UPDATE users SET acciones = %s WHERE user_id = %s", (current_actions, user_id))
+            conn.commit()
+            bot.reply_to(message, f"La acción {stock_symbol} ha sido eliminada satisfactoriamente.")
+        else:
+            bot.reply_to(message, f"No se encontró la acción {stock_symbol} en tus acciones guardadas.")
+    except psycopg2.Error as e:
+        conn.rollback()
+        bot.reply_to(message, f"No se pudo eliminar la acción {stock_symbol}. Error: {e}")
     finally:
         cur.close()
         conn.close()
