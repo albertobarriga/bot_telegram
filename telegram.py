@@ -158,20 +158,51 @@ def account(message):
   # Redirigir al usuario al comando /añadir
     bot.send_message(message.chat.id, "Ahora puedes añadir las acciones que deseas seguir utilizando el comando /añadir .")
 
-# # Comando /añadir
-# @bot.message_handler(commands=['añadir'])
-# def add_stock_symbol(message):
-#     bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
-#     bot.register_next_step_handler(message, process_stock_symbol_input)
+@bot.message_handler(commands=['añadir'])
+def add_stock_symbol(message):
+    bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
+    bot.register_next_step_handler(message, process_stock_symbol_input)
 
-# def process_stock_symbol_input(message):
-#     # Obtener el símbolo de la acción ingresado por el usuario
-#     stock_symbol = message.text.upper()
+def process_stock_symbol_input(message):
+    # Obtener el símbolo de la acción ingresado por el usuario
+    stock_symbol = message.text.upper()
 
-#     # Aquí puedes guardar la acción en la base de datos asociada al usuario
-#     # Por ejemplo, podrías insertar la acción en la tabla de acciones de usuario
+    # Obtener el ID del usuario
+    user_id = message.from_user.id
 
-#     bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
+    # Conectar a la base de datos
+    conn = psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host='db',  # Cambia localhost por el nombre del servicio del contenedor de la base de datos
+        port=os.getenv('DB_PORT')
+    )
+    cur = conn.cursor()
+
+    try:
+        # Obtener las acciones actuales del usuario
+        cur.execute("SELECT acciones FROM users WHERE user_id = %s", (user_id,))
+        current_actions = cur.fetchone()[0]  # Obtenemos la lista de acciones actual
+
+        # Agregar la nueva acción a la lista (si no está ya presente)
+        if current_actions is None:
+            current_actions = []
+        if stock_symbol not in current_actions:
+            current_actions.append(stock_symbol)
+
+        # Actualizar la lista de acciones en la base de datos
+        cur.execute("UPDATE users SET acciones = %s WHERE user_id = %s", (current_actions, user_id))
+        conn.commit()
+        bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
+    except psycopg2.Error as e:
+        conn.rollback()
+        bot.reply_to(message, f"No se pudo añadir la acción {stock_symbol}. Error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
