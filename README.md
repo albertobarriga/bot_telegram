@@ -7,7 +7,7 @@ pip install -r requirements.txt
 
 
 
--ACCEDER A LA BASE DE DATOS:
+- ACCEDER A LA BASE DE DATOS:
 
 psql -U admin -d users
 
@@ -15,13 +15,10 @@ SELECT * FROM users;
 
 
 
--CREAR TABLA EN LA BASE DE DATOS:
+- CREAR TABLA EN LA BASE DE DATOS:
 
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE,
-	acciones text[]
+    acciones TEXT[]
 );
-
-ALTER TABLE users
-ADD COLUMN acciones text[];
