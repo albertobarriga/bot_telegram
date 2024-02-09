@@ -12,6 +12,9 @@ load_dotenv()
 bot = telebot.TeleBot(os.getenv('token'))
 API_KEY = os.getenv('API_KEY')
 
+# Desactivar el webhook
+bot.remove_webhook()
+
 # Diccionario para almacenar los símbolos de las acciones proporcionados por los usuarios
 acciones = {}
 
