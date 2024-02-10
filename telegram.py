@@ -3,6 +3,8 @@ import os
 import requests
 import json
 import matplotlib.pyplot as plt
+from mplfinance.original_flavor import candlestick_ohlc
+import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import psycopg2
@@ -11,6 +13,7 @@ load_dotenv()
 
 bot = telebot.TeleBot(os.getenv('token'))
 API_KEY = os.getenv('API_KEY')
+API_KEY_MARKETAUX = os.getenv('API_KEY_MARKETAUX')
 
 # Desactivar el webhook
 bot.remove_webhook()
@@ -69,7 +72,7 @@ def process_stock_symbol_input_bolsa(message):
 
 def enviar_datos_bolsa(message, stock_symbol):
     # Construir la URL de la API con el símbolo de la acción
-    url = f'https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol={stock_symbol}&interval=5min&apikey={API_KEY}'
+    url = f'https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol={stock_symbol}&apikey={API_KEY_MARKETAUX}'
 
     try:
         # Obtener datos de la API
@@ -90,10 +93,10 @@ def enviar_datos_bolsa(message, stock_symbol):
 
             # Crear un mensaje con la información filtrada
             msg = ""
-            # Obtener las fechas en orden descendente
-            dates_sorted = sorted(filtered_data.keys(), reverse=True)
-            
-            # Tomar solo las primeras dos fechas
+
+            # Obtener las fechas en orden ascendente
+            dates_sorted = sorted(filtered_data.keys())
+                       # Tomar solo las primeras dos fechas
             for date in dates_sorted[:2]:
                 values = filtered_data[date]
                 msg += f"Fecha: {date}\n"
@@ -103,21 +106,32 @@ def enviar_datos_bolsa(message, stock_symbol):
                 msg += f"Valor de cierre: {values['4. close']}\n"
                 msg += f"Volumen: {values['5. volume']}\n"
                 msg += "-----------------------------\n"
+            # Crear una lista de datos de velas
+            ohlc_data = []
+            for date in dates_sorted:
+                values = filtered_data[date]
+                ohlc_data.append((mdates.date2num(datetime.strptime(date, '%Y-%m-%d')),
+                                  float(values['1. open']),
+                                  float(values['2. high']),
+                                  float(values['3. low']),
+                                  float(values['4. close'])))
             
-            # Crear un gráfico de barras con los valores de cierre
-            dates = list(filtered_data.keys())
-            close_values = [float(values['4. close']) for values in filtered_data.values()]
-            plt.figure(figsize=(10, 6))
-            plt.bar(dates, close_values, color='blue')
-            plt.xlabel('Fechas')
-            plt.ylabel('Valor de cierre')
-            plt.title(f'Valores de cierre de {stock_symbol} en los últimos meses')
+            # Crear un gráfico de velas
+            fig, ax = plt.subplots()
+            candlestick_ohlc(ax, ohlc_data, width=20, colorup='g', colordown='r')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.xaxis.set_major_locator(mdates.MonthLocator())
+            ax.set_title(f'Gráfico de velas de {stock_symbol}')
+            plt.xlabel('Fecha')
+            plt.ylabel('Precio')
             plt.xticks(rotation=45)
             plt.tight_layout()
-            plt.savefig('stock_chart.png')
-            # Enviar el mensaje al usuario con la imagen del gráfico
-            bot.send_photo(message.chat.id, open('stock_chart.png', 'rb'))
+            plt.savefig('stock_candlestick_chart.png')
             plt.close()
+            
+            # Enviar el mensaje al usuario con la imagen del gráfico de velas
+            bot.send_photo(message.chat.id, open('stock_candlestick_chart.png', 'rb'))
+            
             # Enviar el mensaje al usuario
             bot.reply_to(message, msg)
         else:
@@ -125,7 +139,7 @@ def enviar_datos_bolsa(message, stock_symbol):
             bot.reply_to(message, f"Error en la solicitud. Código de respuesta: {response.status_code}")
     except Exception as e:
         # Capturar cualquier excepción y mostrar un mensaje al usuario
-        bot.reply_to(message, f"Esta acción no existe o no tenemos informacion: {e}")
+        bot.reply_to(message, f"Esta acción no existe o no tenemos información: {e}")
 
 
 def enviar_noticias(message, stock_symbol):
@@ -133,13 +147,19 @@ def enviar_noticias(message, stock_symbol):
     one_week_ago = now - timedelta(days=7)
     # Formatear la fecha de hace una semana en el formato YYYYMMDDTHHMM
     time_from = one_week_ago.strftime('%Y%m%dT%H%M')
-    url = f'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={stock_symbol}&time_from={time_from}&limit=1000&apikey={API_KEY}'
-    response = requests.get(url)
+    url = f'https://api.marketaux.com/v1/news/all'
+    params = {
+        'symbols': stock_symbol,
+        'filter_entities': True,
+        'language': 'es',
+        'api_token': API_KEY_MARKETAUX,   
+    }
+    response = requests.get(url, params)
     if response.status_code == 200:
         data = json.loads(response.text)
-        if 'feed' in data and data['feed']:
+        if 'data' in data:
             noticias = ""
-            for article in data['feed']:
+            for article in data['data']:
                 title = article.get('title', 'N/A')
                 url = article.get('url', 'N/A')
                 noticias += f"<b>{title}</b>\n{url}\n\n"
@@ -148,8 +168,6 @@ def enviar_noticias(message, stock_symbol):
             bot.reply_to(message, f"No se encontraron noticias para la acción {stock_symbol}.")
     else:
         bot.reply_to(message, f"Error al obtener noticias para la acción {stock_symbol}.")
-
-
 
 # Comando /account
 @bot.message_handler(commands=['account'])
