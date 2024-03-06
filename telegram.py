@@ -118,7 +118,7 @@ def enviar_datos_bolsa(message, stock_symbol):
             
             # Crear un gráfico de velas
             fig, ax = plt.subplots()
-            candlestick_ohlc(ax, ohlc_data, width=18, colorup='g', colordown='r')
+            candlestick_ohlc(ax, ohlc_data[:12], width=20, colorup='g', colordown='r')
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
             ax.xaxis.set_major_locator(mdates.MonthLocator())
             ax.set_title(f'Gráfico de velas de {stock_symbol}')
