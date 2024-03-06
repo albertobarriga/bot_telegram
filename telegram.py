@@ -29,7 +29,7 @@ def send_welcome(message):
                        "y las noticias más relevantes de los últimos 7 días.\n\n"
                        "Puedes utilizar los siguientes comandos:\n"
                        "/bolsa - Para consultar información sobre una acción\n"
-                       "/help - Para obtener ayuda y ver los comandos disponibles")
+                       "/info - Para obtener ayuda y ver los comandos disponibles")
     bot.reply_to(message, welcome_message)
 
 # Comando /info
@@ -45,7 +45,7 @@ def send_info(message):
                     "/consult - Para consultar tus acciones guardadas\n"
                     "/modify - Para eliminar una acción de tus seguimientos\n"
                     "/portfolio - Para obtener información y noticias sobre tus acciones guardadas\n"
-                    "/help - Para obtener ayuda y ver los comandos disponibles")
+                    "/info - Para obtener ayuda y ver los comandos disponibles")
     bot.reply_to(message, info_message)
 
 
@@ -118,7 +118,7 @@ def enviar_datos_bolsa(message, stock_symbol):
             
             # Crear un gráfico de velas
             fig, ax = plt.subplots()
-            candlestick_ohlc(ax, ohlc_data, width=20, colorup='g', colordown='r')
+            candlestick_ohlc(ax, ohlc_data, width=18, colorup='g', colordown='r')
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
             ax.xaxis.set_major_locator(mdates.MonthLocator())
             ax.set_title(f'Gráfico de velas de {stock_symbol}')
@@ -146,13 +146,14 @@ def enviar_noticias(message, stock_symbol):
     now = datetime.now()
     one_week_ago = now - timedelta(days=7)
     # Formatear la fecha de hace una semana en el formato YYYYMMDDTHHMM
-    time_from = one_week_ago.strftime('%Y%m%dT%H%M')
+    time_from = one_week_ago.strftime('%Y-%m-%dT%H:%M:%S')
     url = f'https://api.marketaux.com/v1/news/all'
     params = {
         'symbols': stock_symbol,
         'filter_entities': True,
-        'language': 'es',
-        'api_token': API_KEY_MARKETAUX,   
+        'language': 'en,es',
+        'api_token': API_KEY_MARKETAUX,
+        'published_after': time_from,
     }
     response = requests.get(url, params)
     if response.status_code == 200:
@@ -196,8 +197,39 @@ def account(message):
 
 @bot.message_handler(commands=['add'])
 def add_stock_symbol(message):
-    bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
-    bot.register_next_step_handler(message, process_stock_symbol_input)
+    # Obtener el ID del usuario
+    user_id = message.from_user.id
+
+    # Conectar a la base de datos
+    conn = psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host='db',  # Cambia localhost por el nombre del servicio del contenedor de la base de datos
+        port=os.getenv('DB_PORT')
+    )
+    cur = conn.cursor()
+
+    try:
+        # Verificar si el usuario tiene una cuenta
+        cur.execute("SELECT acciones FROM users WHERE user_id = %s", (user_id,))
+        user_actions = cur.fetchone()
+
+        if user_actions is None:
+            # Si el usuario no tiene una cuenta, informarle y salir
+            bot.reply_to(message, "Antes de añadir una acción, primero debes crear una cuenta con el comando /account.")
+            return
+
+        # Si el usuario tiene una cuenta, continuar con la lógica de agregar una acción
+        bot.reply_to(message, 'Por favor, ingresa el símbolo de la acción que deseas añadir:')
+        bot.register_next_step_handler(message, process_stock_symbol_input)
+    except psycopg2.Error as e:
+        # Manejar cualquier error de base de datos
+        bot.reply_to(message, f"Error de base de datos: {e}")
+    finally:
+        # Cerrar la conexión y el cursor
+        cur.close()
+        conn.close()
 
 def process_stock_symbol_input(message):
     # Obtener el símbolo de la acción ingresado por el usuario
@@ -206,7 +238,7 @@ def process_stock_symbol_input(message):
     # Obtener el ID del usuario
     user_id = message.from_user.id
 
-    # Conectar a la base de datos
+    # Conectar a la base de datos (esta parte puede ser eliminada de aquí y movida a la función `add_stock_symbol` para evitar repetición)
     conn = psycopg2.connect(
         dbname=os.getenv('DB_NAME'),
         user=os.getenv('DB_USER'),
@@ -232,9 +264,11 @@ def process_stock_symbol_input(message):
         conn.commit()
         bot.reply_to(message, f"La acción {stock_symbol} ha sido añadida satisfactoriamente.")
     except psycopg2.Error as e:
+        # Manejar cualquier error de base de datos
         conn.rollback()
         bot.reply_to(message, f"No se pudo añadir la acción {stock_symbol}. Error: {e}")
     finally:
+        # Cerrar la conexión y el cursor
         cur.close()
         conn.close()
 
