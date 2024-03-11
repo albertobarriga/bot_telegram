@@ -22,3 +22,7 @@ CREATE TABLE users (
     user_id INTEGER UNIQUE,
     acciones TEXT[]
 );
+
+- Project doing :
+
+make start
